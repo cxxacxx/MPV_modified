@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from Utils import Algo, IO
 
 def main():
+    
+    control_motor = 0
     '''Initialize state vector'''
     
     #view_joint_angle(f_joint_angle)
@@ -20,6 +22,8 @@ def main():
         trail = 31
         joint_data = joint_data_list[trail][:,0:3] # thigh, knee, and ankle
         thigh_angle = joint_data[:,0]
+        plt.plot(thigh_angle)
+        plt.show()
         foot_acc_z = foot_acc_list[trail][:,2]*9.8
         gait_mode = gait_mode_list[trail]
         
@@ -42,24 +46,23 @@ def main():
         
         for time_step in range(time_step_num):
             # try:
-            mode = gait_mode[time_step,0]
+            if time_step == 156:
+                print("debug pause")
+            mode = gait_mode[time_step]
             
             t = time_step * 0.005;               
-            q_thigh = joint_data[time_step]
+            q_thigh = joint_data[time_step][0]
             acc_z = foot_acc_z[time_step]
             q_thigh_vec = fifo_mat(q_thigh_vec, q_thigh)
-            time_vec = fifo_mat(time_vec, time.time() - start_time)
-            if (mode == 'idel'):
-                mode = 'walk'
-                gait_paras_dict, f_joint_angle = load_gait_paras(mode)
-                
-                
-            if (mode == )
+            time_vec = fifo_mat(time_vec, time_step*0.005)
+            if (mode == 'idle'):
+                mode = 'walk-rampascent'
+            gait_paras_dict, f_joint_angle = load_gait_paras(mode)
             
-            
-            gait_paras_dict, f_joint_angle = load_gait_paras('mode')
-            phase = phase_predictor.forward(q_thigh, acc_z, dt = 100 * (time_vec[-1] - time_vec[0]))
-            print(phase)
+            phase_predictor.gait_paras_dict = gait_paras_dict
+            phase = phase_predictor.forward(q_thigh, acc_z, dt = 1)
+            print(time_step)
+            print(phase)          
             if phase is not None:
                 q_qv_d, q_d_mat = predict_q_qv_d(phase, f_joint_angle, q_d_mat, time_vec)
                 phase_save_vec = fifo_mat(phase_save_vec, phase)
@@ -73,13 +76,13 @@ def main():
                     print('error: {}, desired: {}; actual: {}'.format(q_qv - q_qv_d, q_qv_d, q_qv))
             else:
                 time.sleep(8e-3)  # sleep 8 ms
-            if i % 100 == 0:
+            if time_step % 100 == 0:
                 data = {'q_qv_d_mat': q_qv_d_mat, 'q_qv_mat': q_qv_mat,
                         'phase_save_vec': phase_save_vec,
                         'q_thigh_vec': q_thigh_vec}
-                np.save('results/benchtop_test_{}.npy'.format(time.time()), data)
+                #np.save('results/benchtop_test_{}.npy'.format(time.time()), data)
 
-    view_trajectory(q_qv_d_mat, q_qv_mat, phase_save_vec, q_thigh_vec)
+    #view_trajectory(q_qv_d_mat, q_qv_mat, phase_save_vec, q_thigh_vec)
 
 
 def predict_phase(thigh_angle, phase_vec, thigh_angle_vec, state, gait_paras_dict):
