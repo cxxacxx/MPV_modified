@@ -19,21 +19,23 @@ def main():
     
     for trail in range(31,32):#range(144):
         '''Main loop'''
-        trail = 31
-        joint_data = joint_data_list[trail][:,0:3] # thigh, knee, and ankle
+        trail = 66
+        joint_data = joint_data_list[trail][:,3:6] # thigh, knee, and ankle
         thigh_angle = joint_data[:,0]
-        plt.plot(thigh_angle)
-        plt.show()
         foot_acc_z = foot_acc_list[trail][:,2]*9.8
         gait_mode = gait_mode_list[trail]
         
+        plt.plot(thigh_angle)
+        plt.plot(foot_acc_z)
+        plt.show()
         time_step_num = len(foot_acc_z)
-        time_vec = np.array([-0.01, -0.005])
-        time_step_num = 1000
-        q_qv_d_mat = np.zeros((time_step_num, 4))
-        q_qv_mat = np.zeros((time_step_num, 4))
-        q_thigh_vec = np.zeros(time_step_num)
-        phase_save_vec = np.zeros(time_step_num)
+        time_vec = np.array([-0.02, -0.01])
+        time_step_num = 1500
+        size = int(time_step_num/2)
+        q_qv_d_mat = np.zeros((size, 4))
+        q_qv_mat = np.zeros((size, 4))
+        q_thigh_vec = np.zeros(size)
+        phase_save_vec = np.zeros(size)
         phase_d_vec = np.array([100, 100])
         q_d_mat = np.zeros((2, 2))
         gait_paras_dict, f_joint_angle = load_gait_paras('walk')
@@ -41,28 +43,41 @@ def main():
         phase_predictor = Algo.OnlinePhasePredicter()
         
         gait_num = 0
+        
+        mode = 'walk'
  
         
-        
-        for time_step in range(time_step_num):
+        for time_step in range(0,time_step_num,2):
             # try:
-            if time_step == 156:
+            mode_previous = mode
+            if time_step == 542:
                 print("debug pause")
             mode = gait_mode[time_step]
             
-            t = time_step * 0.005;               
+            t = time_step * 0.01;               
             q_thigh = joint_data[time_step][0]
             acc_z = foot_acc_z[time_step]
             q_thigh_vec = fifo_mat(q_thigh_vec, q_thigh)
-            time_vec = fifo_mat(time_vec, time_step*0.005)
+            time_vec = fifo_mat(time_vec, time_step*0.01)
             if (mode == 'idle'):
-                mode = 'walk-rampascent'
-            gait_paras_dict, f_joint_angle = load_gait_paras(mode)
-            
-            phase_predictor.gait_paras_dict = gait_paras_dict
+                mode = 'walk'
+            if(mode!=mode_previous):
+                gait_paras_dict, f_joint_angle = load_gait_paras(mode)
+                dic = phase_predictor.gait_paras_dict
+                if 'stance_end_idx' in dic.keys():
+                    prev_stance_end_idx = dic['stance_end_idx']
+                    gait_paras_dict['stance_end_idx'] = prev_stance_end_idx
+                phase_predictor.gait_paras_dict = gait_paras_dict
+
+            # dic = phase_predictor.gait_paras_dict
+            # dic['stance_end_idx']
             phase = phase_predictor.forward(q_thigh, acc_z, dt = 1)
             print(time_step)
-            print(phase)          
+            print(phase)
+            
+            if phase is None:
+                phase_save_vec = fifo_mat(phase_save_vec, 200)
+            
             if phase is not None:
                 q_qv_d, q_d_mat = predict_q_qv_d(phase, f_joint_angle, q_d_mat, time_vec)
                 phase_save_vec = fifo_mat(phase_save_vec, phase)
@@ -82,7 +97,7 @@ def main():
                         'q_thigh_vec': q_thigh_vec}
                 #np.save('results/benchtop_test_{}.npy'.format(time.time()), data)
 
-    #view_trajectory(q_qv_d_mat, q_qv_mat, phase_save_vec, q_thigh_vec)
+    view_trajectory(q_qv_d_mat, q_qv_mat, phase_save_vec, q_thigh_vec)
 
 
 def predict_phase(thigh_angle, phase_vec, thigh_angle_vec, state, gait_paras_dict):
@@ -142,7 +157,8 @@ def load_gait_paras(mode='walk'):
 
 
 def view_joint_angle(f_joint_angle):
-    plt.plot(f_joint_angle(np.linspace(0, 100, 101)) - f_joint_angle(0))
+    #plt.plot(f_joint_angle(np.linspace(0, 100, 101)) - f_joint_angle(0))
+    plt.plot(f_joint_angle(np.linspace(0, 100, 101)))
     plt.legend(['Hip', 'Knee', 'Ankle'])
     plt.show()
 
